@@ -222,16 +222,20 @@ pip install langchain-openai>=0.2.0
 ## Updated Project Structure
 
 ```
-Project/
+Smart Contract Summary & QA Assistant/
 ├── config.py                   # Centralized configuration
-├── init_vectordb.py            # Vector DB initialization script
 ├── requirements.txt            # Python dependencies (updated)
+├── .env.example                # Environment variable template
 ├── pipelines/
-│   ├── __init__.py             # Package init
+│   ├── __init__.py             # Public API re-exports
 │   ├── ingestion.py            # Phase 1: extraction, chunking, embedding
+│   ├── vectorstore.py          # Shared embedding model & ChromaDB access
 │   ├── retrieval.py            # Phase 2: semantic search (NEW)
 │   └── llm_pipeline.py         # Phase 2: LLM inference + guardrails (NEW)
-└── data/
+├── scripts/
+│   └── init_vectordb.py        # Vector DB initialization & reset
+├── docs/                       # Project documentation & specs
+└── data/                       # Auto-created at runtime
     ├── uploads/                # Stored document copies
     └── vectorstore/            # Persistent ChromaDB storage
 ```

@@ -13,14 +13,18 @@ Phase 1 establishes the project foundation: a Python environment, a structured r
 The repository was organized into a clean, modular layout:
 
 ```
-Project/
+Smart Contract Summary & QA Assistant/
 ├── config.py               # Centralized configuration
-├── init_vectordb.py         # Vector DB initialization script
 ├── requirements.txt         # Python dependencies
+├── .env.example             # Environment variable template
 ├── pipelines/
-│   ├── __init__.py          # Makes pipelines a Python package
-│   └── ingestion.py         # Full ingestion pipeline
-└── data/
+│   ├── __init__.py          # Public API re-exports
+│   ├── ingestion.py         # Full ingestion pipeline
+│   └── vectorstore.py       # Shared embedding model & ChromaDB access
+├── scripts/
+│   └── init_vectordb.py     # Vector DB initialization & reset
+├── docs/                    # Project documentation & specs
+└── data/                    # Auto-created at runtime
     ├── uploads/             # Stores copies of uploaded documents
     └── vectorstore/         # Persistent ChromaDB storage
 ```
@@ -293,7 +297,7 @@ python -m pipelines.ingestion contract.pdf 500 100
 
 ---
 
-### Step 5 — Vector DB Initialization Script (`init_vectordb.py`)
+### Step 5 — Vector DB Initialization Script (`scripts/init_vectordb.py`)
 
 A standalone utility to create or reset the ChromaDB instance:
 
@@ -312,10 +316,10 @@ def init_vectordb(reset: bool = False) -> None:
 **Usage:**
 ```bash
 # Create or verify the collection exists
-python init_vectordb.py
+python -m scripts.init_vectordb
 
 # Wipe all data and start fresh
-python init_vectordb.py --reset
+python -m scripts.init_vectordb --reset
 ```
 
 - `--reset` deletes the entire `data/vectorstore/` directory and recreates it, useful when re-ingesting documents from scratch.
@@ -329,7 +333,7 @@ The pipeline was tested end-to-end with the project's own spec document:
 
 ```bash
 # 1. Initialize vector store
-python init_vectordb.py --reset
+python -m scripts.init_vectordb --reset
 # Output: Collection 'contracts' ready ─ 0 documents stored
 
 # 2. Ingest a PDF
@@ -373,5 +377,5 @@ python -m pipelines.ingestion Smart_Contract_Assistant_Spec.pdf
 - [x] Base folder structure (`pipelines/`, `data/uploads/`, `data/vectorstore/`)
 - [x] `config.py` with centralized, overridable settings
 - [x] `pipelines/ingestion.py` with extraction, configurable chunking, and embedding
-- [x] `init_vectordb.py` for vector DB initialization and reset
+- [x] `scripts/init_vectordb.py` for vector DB initialization and reset
 - [x] Successful end-to-end test with a real PDF document

@@ -18,21 +18,22 @@ Coursework and project materials for the **NVIDIA Deep Learning Institute (DLI)*
 │   │   ├── 07_vectorstores.ipynb
 │   │   ├── 08_evaluation.ipynb
 │   │   └── 09_langserve.ipynb
-│   ├── docs/                                  # Project documentation & specs
-│   │   ├── AI Agent Project Initialization Prompt.md
-│   │   ├── Phase 1.md
-│   │   ├── Phase 2.md
-│   │   └── Smart_Contract_Assistant_Spec.pdf
-│   ├── pipelines/                             # Core RAG pipeline modules
-│   │   ├── ingestion.py                       # Document ingestion pipeline
-│   │   ├── retrieval.py                       # Semantic search & retrieval
-│   │   ├── llm_pipeline.py                    # LLM answer generation with guardrails
-│   │   └── vectorstore.py                     # ChromaDB vector store helpers
-│   ├── scripts/                               # Utility scripts
-│   │   └── init_vectordb.py                   # Vector DB initialization & reset
-│   ├── config.py                              # Centralized configuration
-│   ├── requirements.txt                       # Python dependencies
-│   └── .env.example                           # Environment variable template
+│   └── Smart Contract Summary & QA Assistant/ # Capstone RAG project
+│       ├── docs/                              # Project documentation & specs
+│       │   ├── AI Agent Project Initialization Prompt.md
+│       │   ├── Phase 1.md
+│       │   ├── Phase 2.md
+│       │   └── Smart_Contract_Assistant_Spec.pdf
+│       ├── pipelines/                         # Core RAG pipeline modules
+│       │   ├── ingestion.py                   # Document ingestion pipeline
+│       │   ├── retrieval.py                   # Semantic search & retrieval
+│       │   ├── llm_pipeline.py                # LLM answer generation with guardrails
+│       │   └── vectorstore.py                 # ChromaDB vector store helpers
+│       ├── scripts/                           # Utility scripts
+│       │   └── init_vectordb.py               # Vector DB initialization & reset
+│       ├── config.py                          # Centralized configuration
+│       ├── requirements.txt                   # Python dependencies
+│       └── .env.example                       # Environment variable template
 │
 ├── .gitignore
 └── README.md
@@ -73,7 +74,7 @@ A local RAG application that lets users upload contracts (PDF/DOCX) and ask ques
 #### Getting Started
 
 ```bash
-cd "Level 2"
+cd "Level 2/Smart Contract Summary & QA Assistant"
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
