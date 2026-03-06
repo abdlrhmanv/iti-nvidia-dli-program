@@ -1,0 +1,29 @@
+# Core Frameworks
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0
+langserve>=0.3.0
+fastapi>=0.115.0
+uvicorn>=0.32.0
+
+# UI
+gradio>=5.0.0
+
+# Vector Store
+chromadb>=0.5.0
+
+# Embeddings (lightweight model for RTX 3060 6GB)
+sentence-transformers>=3.0.0
+
+# File Parsing
+PyMuPDF>=1.24.0
+pdfplumber>=0.11.0
+python-docx>=1.1.0
+
+# LLM (local inference - quantized for 6GB VRAM)
+llama-cpp-python>=0.3.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
