@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+dist/
+build/
 
 # Virtual environments
 venv/
@@ -9,6 +11,13 @@ venv/
 
 # Environment
 .env
+
+# Runtime data
+data/uploads/
+data/vectorstore/
+
+# Models (downloaded at runtime)
+*.gguf
 
 # IDE
 .vscode/
@@ -19,3 +28,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
