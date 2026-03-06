@@ -1,14 +1,18 @@
 """
 Initialize (or reset) the ChromaDB vector store.
 
-Usage:
-    python init_vectordb.py          # create / verify the collection
-    python init_vectordb.py --reset  # delete existing data and recreate
+Usage (from project root):
+    python -m scripts.init_vectordb          # create / verify the collection
+    python -m scripts.init_vectordb --reset  # delete existing data and recreate
 """
 
 import argparse
 import logging
 import shutil
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import chromadb
 

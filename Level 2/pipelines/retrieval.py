@@ -11,7 +11,7 @@ from typing import Optional
 from langchain_core.documents import Document
 
 import config
-from pipelines.ingestion import get_vectorstore
+from pipelines.vectorstore import get_vectorstore
 
 logger = logging.getLogger(__name__)
 

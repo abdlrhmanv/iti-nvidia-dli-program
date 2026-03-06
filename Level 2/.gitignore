@@ -10,8 +10,10 @@ dist/
 build/
 
 # Runtime data
-data/uploads/
-data/vectorstore/
+data/
+
+# Downloaded models
+models/
 
 # Environment
 .env
