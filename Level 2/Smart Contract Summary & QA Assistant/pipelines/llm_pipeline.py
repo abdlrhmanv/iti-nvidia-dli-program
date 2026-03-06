@@ -2,9 +2,7 @@
 LLM answer pipeline: format prompts with retrieved context, enforce
 grounding guardrails, call the LLM, and return an answer with citations.
 
-Supports two providers:
-  - "openai" : OpenAI ChatCompletion API (default)
-  - "local"  : llama-cpp-python with a GGUF quantized model on GPU
+Uses a local GGUF quantized model via llama-cpp-python on GPU.
 """
 
 from __future__ import annotations
@@ -13,6 +11,7 @@ import logging
 import re
 from typing import Optional
 
+from langchain_community.llms import LlamaCpp
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -51,65 +50,38 @@ _rag_prompt = ChatPromptTemplate.from_messages([
 ])
 
 
-# ── LLM Provider ─────────────────────────────────────────────────
+# ── LLM (Local GGUF) ─────────────────────────────────────────────
 
 _llm_instance = None
 
 
 def get_llm():
     """
-    Lazy-load the LLM based on config.LLM_PROVIDER.
-    Singleton to avoid reloading the model on every call.
+    Lazy-load the local LLM (singleton).
+    Uses llama-cpp-python with a GGUF quantized model on GPU.
     """
     global _llm_instance
     if _llm_instance is not None:
         return _llm_instance
 
-    provider = config.LLM_PROVIDER.lower()
-
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-
-        if not config.OPENAI_API_KEY:
-            raise ValueError(
-                "LLM_PROVIDER is 'openai' but OPENAI_API_KEY is not set. "
-                "Set it in your .env file or environment."
-            )
-        _llm_instance = ChatOpenAI(
-            api_key=config.OPENAI_API_KEY,
-            model=config.OPENAI_MODEL,
-            temperature=config.LLM_TEMPERATURE,
-            max_tokens=config.LLM_MAX_TOKENS,
-        )
-        logger.info(
-            "Loaded OpenAI LLM: %s (temperature=%.2f)",
-            config.OPENAI_MODEL, config.LLM_TEMPERATURE,
-        )
-
-    elif provider == "local":
-        from langchain_community.llms import LlamaCpp
-
-        if not config.LOCAL_MODEL_PATH:
-            raise ValueError(
-                "LLM_PROVIDER is 'local' but LOCAL_MODEL_PATH is not set. "
-                "Download a GGUF model and set the path in config or .env."
-            )
-        _llm_instance = LlamaCpp(
-            model_path=config.LOCAL_MODEL_PATH,
-            n_ctx=config.LLM_N_CTX,
-            n_gpu_layers=config.LLM_N_GPU_LAYERS,
-            temperature=config.LLM_TEMPERATURE,
-            max_tokens=config.LLM_MAX_TOKENS,
-            verbose=False,
-        )
-        logger.info(
-            "Loaded local LLM from %s (ctx=%d, gpu_layers=%d)",
-            config.LOCAL_MODEL_PATH, config.LLM_N_CTX, config.LLM_N_GPU_LAYERS,
-        )
-    else:
+    if not config.LOCAL_MODEL_PATH:
         raise ValueError(
-            f"Unknown LLM_PROVIDER: {provider!r}. Use 'openai' or 'local'."
+            "LOCAL_MODEL_PATH is not set. "
+            "Download a GGUF model and set the path in your .env file."
         )
+
+    _llm_instance = LlamaCpp(
+        model_path=config.LOCAL_MODEL_PATH,
+        n_ctx=config.LLM_N_CTX,
+        n_gpu_layers=config.LLM_N_GPU_LAYERS,
+        temperature=config.LLM_TEMPERATURE,
+        max_tokens=config.LLM_MAX_TOKENS,
+        verbose=False,
+    )
+    logger.info(
+        "Loaded local LLM from %s (ctx=%d, gpu_layers=%d)",
+        config.LOCAL_MODEL_PATH, config.LLM_N_CTX, config.LLM_N_GPU_LAYERS,
+    )
 
     return _llm_instance
 

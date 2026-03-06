@@ -26,19 +26,12 @@ CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "contracts")
 # ── Retrieval ────────────────────────────────────────────────────
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
-# ── LLM Settings ────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "local"
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
-
-# OpenAI API (default provider)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-# Local GGUF model
+# ── LLM Settings (local GGUF model via llama-cpp-python) ────────
 LOCAL_MODEL_PATH = os.getenv("LOCAL_MODEL_PATH", "")
 LLM_N_CTX = int(os.getenv("LLM_N_CTX", "4096"))
 LLM_N_GPU_LAYERS = int(os.getenv("LLM_N_GPU_LAYERS", "33"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
 
 # ── Server ───────────────────────────────────────────────────────
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
