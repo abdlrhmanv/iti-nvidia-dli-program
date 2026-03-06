@@ -112,15 +112,17 @@ CHROMA_COLLECTION_NAME = "contracts"
 #### LLM Settings (prepared for Phase 2)
 
 ```python
-LLM_PROVIDER = "local"          # "local" or "openai"
-LOCAL_MODEL_PATH = ""           # Path to a GGUF quantized model
-LLM_N_CTX = 4096               # Context window size
-LLM_N_GPU_LAYERS = 33          # Layers offloaded to GPU
+LLM_PROVIDER = "openai"         # "openai" or "local"
+OPENAI_API_KEY = ""             # OpenAI API key (set in .env)
+OPENAI_MODEL = "gpt-4o-mini"   # Default OpenAI model
+LOCAL_MODEL_PATH = ""           # Path to a GGUF quantized model (if local)
+LLM_N_CTX = 4096               # Context window size (local only)
+LLM_N_GPU_LAYERS = 33          # Layers offloaded to GPU (local only)
 LLM_TEMPERATURE = 0.1          # Low temperature for factual answers
 LLM_MAX_TOKENS = 1024          # Max generation length
 ```
 
-These are placeholders configured for Phase 2. The low temperature (0.1) is deliberate — contract Q&A requires factual, deterministic answers.
+These are configured for Phase 2. The low temperature (0.1) is deliberate — contract Q&A requires factual, deterministic answers. OpenAI is the default provider; a local GGUF model via `llama-cpp-python` is available as a fallback.
 
 #### Server & File Support
 

@@ -11,6 +11,7 @@ gradio>=5.0.0
 
 # Vector Store
 chromadb>=0.5.0
+langchain-chroma>=0.2.0
 
 # Embeddings (lightweight model for RTX 3060 6GB)
 sentence-transformers>=3.0.0
