@@ -2,9 +2,8 @@
 LLM answer pipeline: format prompts with retrieved context, enforce
 grounding guardrails, call the LLM, and return an answer with citations.
 
-Supports three providers:
-  - "nvidia" : NVIDIA API Catalog (OpenAI-compatible, default)
-  - "openai" : OpenAI ChatCompletion API
+Supports two providers:
+  - "openai" : OpenAI ChatCompletion API (default)
   - "local"  : llama-cpp-python with a GGUF quantized model on GPU
 """
 
@@ -68,27 +67,7 @@ def get_llm():
 
     provider = config.LLM_PROVIDER.lower()
 
-    if provider == "nvidia":
-        from langchain_openai import ChatOpenAI
-
-        if not config.NVIDIA_API_KEY:
-            raise ValueError(
-                "LLM_PROVIDER is 'nvidia' but NVIDIA_API_KEY is not set. "
-                "Get a key at https://build.nvidia.com and set it in your .env file."
-            )
-        _llm_instance = ChatOpenAI(
-            base_url=config.NVIDIA_BASE_URL,
-            api_key=config.NVIDIA_API_KEY,
-            model=config.NVIDIA_MODEL,
-            temperature=config.LLM_TEMPERATURE,
-            max_tokens=config.LLM_MAX_TOKENS,
-        )
-        logger.info(
-            "Loaded NVIDIA LLM: %s (temperature=%.2f)",
-            config.NVIDIA_MODEL, config.LLM_TEMPERATURE,
-        )
-
-    elif provider == "openai":
+    if provider == "openai":
         from langchain_openai import ChatOpenAI
 
         if not config.OPENAI_API_KEY:
@@ -98,10 +77,14 @@ def get_llm():
             )
         _llm_instance = ChatOpenAI(
             api_key=config.OPENAI_API_KEY,
+            model=config.OPENAI_MODEL,
             temperature=config.LLM_TEMPERATURE,
             max_tokens=config.LLM_MAX_TOKENS,
         )
-        logger.info("Loaded OpenAI LLM (temperature=%.2f)", config.LLM_TEMPERATURE)
+        logger.info(
+            "Loaded OpenAI LLM: %s (temperature=%.2f)",
+            config.OPENAI_MODEL, config.LLM_TEMPERATURE,
+        )
 
     elif provider == "local":
         from langchain_community.llms import LlamaCpp
@@ -125,8 +108,7 @@ def get_llm():
         )
     else:
         raise ValueError(
-            f"Unknown LLM_PROVIDER: {provider!r}. "
-            "Use 'nvidia', 'openai', or 'local'."
+            f"Unknown LLM_PROVIDER: {provider!r}. Use 'openai' or 'local'."
         )
 
     return _llm_instance
