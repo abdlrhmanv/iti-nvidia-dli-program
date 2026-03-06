@@ -27,14 +27,22 @@ CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "contracts")
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
 # ── LLM Settings ────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "local")  # "local" or "openai"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia")  # "nvidia", "openai", or "local"
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+
+# NVIDIA API (default provider)
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+
+# OpenAI API
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# Local GGUF model
 LOCAL_MODEL_PATH = os.getenv("LOCAL_MODEL_PATH", "")
 LLM_N_CTX = int(os.getenv("LLM_N_CTX", "4096"))
 LLM_N_GPU_LAYERS = int(os.getenv("LLM_N_GPU_LAYERS", "33"))
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
 
 # ── Server ───────────────────────────────────────────────────────
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
