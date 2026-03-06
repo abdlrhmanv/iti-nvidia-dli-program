@@ -4,11 +4,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 
 # ── Directory Paths ──────────────────────────────────────────────
-UPLOAD_DIR = BASE_DIR / "data" / "uploads"
-VECTORSTORE_DIR = BASE_DIR / "data" / "vectorstore"
-
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-VECTORSTORE_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"
+VECTORSTORE_DIR = DATA_DIR / "vectorstore"
+DOCS_DIR = BASE_DIR / "docs"
+SCRIPTS_DIR = BASE_DIR / "scripts"
 
 # ── Chunking Settings ────────────────────────────────────────────
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
@@ -30,7 +30,6 @@ RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "local")  # "local" or "openai"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-# Local LLM (GGUF quantized model path for llama-cpp-python)
 LOCAL_MODEL_PATH = os.getenv("LOCAL_MODEL_PATH", "")
 LLM_N_CTX = int(os.getenv("LLM_N_CTX", "4096"))
 LLM_N_GPU_LAYERS = int(os.getenv("LLM_N_GPU_LAYERS", "33"))
@@ -43,3 +42,13 @@ API_PORT = int(os.getenv("API_PORT", "8000"))
 
 # ── Supported File Extensions ────────────────────────────────────
 SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
+
+
+def ensure_dirs() -> None:
+    """Create runtime directories if they don't exist."""
+    for d in (UPLOAD_DIR, VECTORSTORE_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+# Auto-create on first import so the rest of the app can assume they exist.
+ensure_dirs()
