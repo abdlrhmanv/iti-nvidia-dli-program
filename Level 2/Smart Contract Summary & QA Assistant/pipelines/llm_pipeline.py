@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Optional
 
-from langchain_community.llms import LlamaCpp
+from langchain_community.chat_models import ChatLlamaCpp
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -70,7 +70,7 @@ def get_llm():
             "Download a GGUF model and set the path in your .env file."
         )
 
-    _llm_instance = LlamaCpp(
+    _llm_instance = ChatLlamaCpp(
         model_path=config.LOCAL_MODEL_PATH,
         n_ctx=config.LLM_N_CTX,
         n_gpu_layers=config.LLM_N_GPU_LAYERS,
