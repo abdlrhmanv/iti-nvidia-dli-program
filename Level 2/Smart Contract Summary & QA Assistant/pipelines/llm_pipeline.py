@@ -2,16 +2,18 @@
 LLM answer pipeline: format prompts with retrieved context, enforce
 grounding guardrails, call the LLM, and return an answer with citations.
 
-Uses a local GGUF quantized model via llama-cpp-python on GPU.
+Uses a local GGUF model (llama-cpp-python) when LOCAL_MODEL_PATH is set,
+otherwise falls back to OpenAI if OPENAI_API_KEY is set.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Optional
 
-from langchain_community.chat_models import ChatLlamaCpp
+from langchain_community.chat_models.llamacpp import ChatLlamaCpp
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -23,67 +25,117 @@ logger = logging.getLogger(__name__)
 
 # ── Prompt Templates ─────────────────────────────────────────────
 
-SYSTEM_PROMPT = """\
-You are a precise contract analysis assistant. Your role is to answer \
-questions about uploaded documents using ONLY the provided context.
+RAG_PROMPT_TEMPLATE = """\
+You are a helpful document analysis assistant. The user has uploaded a \
+document. Below are excerpts from that document followed by the user's question.
 
-RULES YOU MUST FOLLOW:
-1. Answer ONLY from the context provided below. If the context does not \
-contain enough information, say "I cannot find this information in the \
-uploaded documents."
-2. NEVER invent, assume, or hallucinate information not present in the context.
-3. Cite your sources using [Source N] tags that correspond to the context \
-chunks provided.
-4. Keep answers concise and factual.
-5. If the question is ambiguous, ask for clarification rather than guessing.
-6. For legal/contractual content, include a disclaimer that this is not \
-legal advice.
+INSTRUCTIONS:
+- Answer ONLY based on the document excerpts below.
+- These excerpts ARE the document — do NOT say you don't know which document is being discussed.
+- If asked what the document is about, summarize the key topics from the excerpts.
+- Cite your sources using [Source N] tags.
+- Be concise and factual. Do not make up information.
 
-CONTEXT:
-{context}"""
+DOCUMENT EXCERPTS:
+{context}
 
-HUMAN_TEMPLATE = "{question}"
+USER QUESTION: {question}
 
-_rag_prompt = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    ("human", HUMAN_TEMPLATE),
-])
+ANSWER:"""
+
+RAG_PROMPT_WITH_HISTORY = """\
+You are a helpful document analysis assistant. The user has uploaded a \
+document. Below are excerpts from that document, followed by the recent \
+conversation and the user's latest question.
+
+INSTRUCTIONS:
+- Answer ONLY based on the document excerpts below.
+- These excerpts ARE the document — do NOT say you don't know which document is being discussed.
+- If asked what the document is about, summarize the key topics from the excerpts.
+- Cite your sources using [Source N] tags.
+- Be concise and factual. Do not make up information.
+- Use the conversation history for context on follow-up questions.
+
+DOCUMENT EXCERPTS:
+{context}
+
+CONVERSATION HISTORY:
+{history}
+
+USER QUESTION: {question}
+
+ANSWER:"""
 
 
-# ── LLM (Local GGUF) ─────────────────────────────────────────────
+def _build_prompt(context: str, question: str, history: str = ""):
+    """Select the right prompt template based on whether history exists."""
+    if history.strip():
+        template = ChatPromptTemplate.from_messages([
+            ("human", RAG_PROMPT_WITH_HISTORY),
+        ])
+        return template.format_messages(
+            context=context, question=question, history=history
+        )
+    else:
+        template = ChatPromptTemplate.from_messages([
+            ("human", RAG_PROMPT_TEMPLATE),
+        ])
+        return template.format_messages(context=context, question=question)
+
+
+# ── LLM (Local GGUF or OpenAI fallback) ───────────────────────────
 
 _llm_instance = None
 
 
+def _use_local_llm() -> bool:
+    """True if a local GGUF model path is set and the file exists."""
+    if not config.LOCAL_MODEL_PATH:
+        return False
+    return Path(config.LOCAL_MODEL_PATH).expanduser().exists()
+
+
 def get_llm():
     """
-    Lazy-load the local LLM (singleton).
-    Uses llama-cpp-python with a GGUF quantized model on GPU.
+    Lazy-load the LLM (singleton).
+    Prefers local GGUF (llama-cpp-python) if LOCAL_MODEL_PATH is set and exists;
+    otherwise uses OpenAI if OPENAI_API_KEY is set.
     """
     global _llm_instance
     if _llm_instance is not None:
         return _llm_instance
 
-    if not config.LOCAL_MODEL_PATH:
-        raise ValueError(
-            "LOCAL_MODEL_PATH is not set. "
-            "Download a GGUF model and set the path in your .env file."
+    if _use_local_llm():
+        _llm_instance = ChatLlamaCpp(
+            model_path=config.LOCAL_MODEL_PATH,
+            n_ctx=config.LLM_N_CTX,
+            n_gpu_layers=config.LLM_N_GPU_LAYERS,
+            temperature=config.LLM_TEMPERATURE,
+            max_tokens=config.LLM_MAX_TOKENS,
+            verbose=False,
         )
+        logger.info(
+            "Loaded local LLM from %s (ctx=%d, gpu_layers=%d)",
+            config.LOCAL_MODEL_PATH, config.LLM_N_CTX, config.LLM_N_GPU_LAYERS,
+        )
+        return _llm_instance
 
-    _llm_instance = ChatLlamaCpp(
-        model_path=config.LOCAL_MODEL_PATH,
-        n_ctx=config.LLM_N_CTX,
-        n_gpu_layers=config.LLM_N_GPU_LAYERS,
-        temperature=config.LLM_TEMPERATURE,
-        max_tokens=config.LLM_MAX_TOKENS,
-        verbose=False,
-    )
-    logger.info(
-        "Loaded local LLM from %s (ctx=%d, gpu_layers=%d)",
-        config.LOCAL_MODEL_PATH, config.LLM_N_CTX, config.LLM_N_GPU_LAYERS,
-    )
+    if config.OPENAI_API_KEY:
+        from langchain_openai import ChatOpenAI
+        _llm_instance = ChatOpenAI(
+            model=config.OPENAI_MODEL,
+            api_key=config.OPENAI_API_KEY,
+            temperature=config.LLM_TEMPERATURE,
+            max_tokens=config.LLM_MAX_TOKENS,
+        )
+        logger.info("Using OpenAI model: %s", config.OPENAI_MODEL)
+        return _llm_instance
 
-    return _llm_instance
+    raise ValueError(
+        "No LLM configured. Either:\n"
+        "  1. Set LOCAL_MODEL_PATH in .env to a GGUF model file (e.g. ./models/your-model.gguf), or\n"
+        "  2. Set OPENAI_API_KEY in .env to use OpenAI (e.g. gpt-4o-mini)."
+    )
 
 
 # ── RAG Chain ─────────────────────────────────────────────────────
@@ -188,6 +240,81 @@ def answer_question(
         "sources": sources,
         "raw_answer": raw_answer,
     }
+
+
+def stream_answer_question(
+    question: str,
+    top_k: Optional[int] = None,
+    chat_history: list[dict] | None = None,
+):
+    """
+    Streaming RAG pipeline — yields partial results as tokens arrive.
+    Supports multi-turn conversation via chat_history.
+
+    Yields dicts with:
+      - answer: the accumulated answer so far
+      - sources: list of {source, chunk_index, relevance_score} dicts
+      - done: True on the final yield (after guardrails applied)
+    """
+    context_docs = retrieve_chunks(question, top_k=top_k)
+
+    sources = [
+        {
+            "source": doc.metadata.get("source", "unknown"),
+            "chunk_index": doc.metadata.get("chunk_index", -1),
+            "relevance_score": doc.metadata.get("relevance_score", 0.0),
+        }
+        for doc in context_docs
+    ]
+
+    if not context_docs:
+        yield {
+            "answer": (
+                "No relevant documents were found for your question. "
+                "Please upload a document first."
+            ),
+            "sources": [],
+            "done": True,
+        }
+        return
+
+    context_str = format_context(context_docs)
+
+    # Build conversation history string from recent exchanges
+    history_str = ""
+    if chat_history:
+        pairs = []
+        for entry in chat_history:
+            role = entry.get("role", "")
+            content = entry.get("content", "")
+            
+            # Gradio can pass files as lists/tuples in the content field
+            if not isinstance(content, str):
+                continue
+                
+            if role == "user":
+                pairs.append(f"User: {content}")
+            elif role == "assistant" and not content.startswith("✅ I've loaded"):
+                # Skip system messages (upload confirmations)
+                pairs.append(f"Assistant: {content}")
+        # Keep only last 6 exchanges to avoid context overflow
+        history_str = "\n".join(pairs[-6:])
+
+    prompt = _build_prompt(context_str, question, history_str)
+    llm = get_llm()
+
+    raw_answer = ""
+    for chunk in llm.stream(prompt):
+        token = chunk.content if hasattr(chunk, "content") else str(chunk)
+        raw_answer += token
+        yield {"answer": raw_answer, "sources": sources, "done": False}
+
+    final_answer = apply_output_guardrails(raw_answer, context_docs)
+    logger.info(
+        "Streamed answer with %d sources: '%.80s...'",
+        len(sources), question,
+    )
+    yield {"answer": final_answer, "sources": sources, "done": True}
 
 
 # ── CLI helper ───────────────────────────────────────────────────

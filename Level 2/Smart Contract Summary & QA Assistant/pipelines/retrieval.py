@@ -23,25 +23,23 @@ def retrieve_chunks(
     """
     Retrieve the most relevant document chunks for a user query.
 
-    Uses cosine similarity (via normalized embeddings) against the
-    persistent ChromaDB collection.
-
-    Returns LangChain Documents with .page_content and .metadata
-    (source filename, chunk_index, relevance score).
+    Uses the persistent ChromaDB collection. Returns LangChain Documents
+    with .page_content and .metadata (source filename, chunk_index, distance).
     """
     top_k = top_k or config.RETRIEVAL_TOP_K
     store = get_vectorstore()
 
-    results = store.similarity_search_with_relevance_scores(query, k=top_k)
+    # similarity_search returns documents ordered by relevance
+    results = store.similarity_search_with_score(query, k=top_k)
 
     docs: list[Document] = []
-    for doc, score in results:
-        doc.metadata["relevance_score"] = round(score, 4)
+    for doc, distance in results:
+        doc.metadata["relevance_score"] = round(distance, 4)
         docs.append(doc)
 
     logger.info(
-        "Retrieved %d chunks for query (top_k=%d): '%.80s...'",
-        len(docs), top_k, query,
+        "Retrieved %d chunks for: '%.80s...'",
+        len(docs), query,
     )
     return docs
 
