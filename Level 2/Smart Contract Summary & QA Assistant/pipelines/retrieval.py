@@ -11,7 +11,7 @@ from typing import Optional
 from langchain_core.documents import Document
 
 import config
-from pipelines.vectorstore import get_vectorstore
+from pipelines.vectorstore import get_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +23,20 @@ def retrieve_chunks(
     """
     Retrieve the most relevant document chunks for a user query.
 
-    Uses the persistent ChromaDB collection. Returns LangChain Documents
-    with .page_content and .metadata (source filename, chunk_index, distance).
+    Uses the MultiVectorRetriever. Small child chunks are matched against the 
+    query in ChromaDB, but the Retriever automatically returns the larger Parent 
+    Documents from the Docstore.
     """
     top_k = top_k or config.RETRIEVAL_TOP_K
-    store = get_vectorstore()
+    retriever = get_retriever()
+    retriever.search_kwargs["k"] = top_k
 
-    # similarity_search returns documents ordered by relevance
-    results = store.similarity_search_with_score(query, k=top_k)
-
-    docs: list[Document] = []
-    for doc, distance in results:
-        doc.metadata["relevance_score"] = round(distance, 4)
-        docs.append(doc)
+    # Because MultiVectorRetriever returns Documents without distance scores attached 
+    # to the top-level parent directly, we just return the parents.
+    docs = retriever.invoke(query)
 
     logger.info(
-        "Retrieved %d chunks for: '%.80s...'",
+        "Retrieved %d Parent chunks for: '%.80s...'",
         len(docs), query,
     )
     return docs

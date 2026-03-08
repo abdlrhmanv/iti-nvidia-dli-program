@@ -23,18 +23,17 @@ from pipelines.retrieval import retrieve_chunks, format_context
 
 logger = logging.getLogger(__name__)
 
-# ── Prompt Templates ─────────────────────────────────────────────
+# ── Prompt Templates (tuned for natural, human-like answers) ──────
 
 RAG_PROMPT_TEMPLATE = """\
-You are a helpful document analysis assistant. The user has uploaded a \
-document. Below are excerpts from that document followed by the user's question.
+You are an expert legal and contractual assistant responding to user inquiries based strictly on the provided document excerpts.
 
-INSTRUCTIONS:
-- Answer ONLY based on the document excerpts below.
-- These excerpts ARE the document — do NOT say you don't know which document is being discussed.
-- If asked what the document is about, summarize the key topics from the excerpts.
-- Cite your sources using [Source N] tags.
-- Be concise and factual. Do not make up information.
+Guidelines:
+- **Cite Sources explicitly**: Incorporate citations inline exactly where the information is stated using the format [Source N] (e.g., "The termination period is 30 days [Source 2].").
+- **Clarity and Structure**: Use short, professional sentences. Break your response into readable paragraphs. If listing requirements, clauses, or multiple points, ALWAYS use bullet points for readability. DO NOT output a single wall of text.
+- **Strict Grounding**: Base your answer ONLY on the excerpts below. If the answer cannot be found in the provided text, state clearly: "I cannot find the answer to this question in the provided document." Do not hallucinate or guess.
+- **Completeness**: Provide a comprehensive yet concise answer covering all necessary details from the text.
+- **Follow-up Questions**: At the very end of your response, provide 3 suggested follow-up questions the user could ask to learn more about this topic, formatted as a bulleted list titled '💡 **Suggested Follow-up Questions:**'
 
 DOCUMENT EXCERPTS:
 {context}
@@ -44,17 +43,14 @@ USER QUESTION: {question}
 ANSWER:"""
 
 RAG_PROMPT_WITH_HISTORY = """\
-You are a helpful document analysis assistant. The user has uploaded a \
-document. Below are excerpts from that document, followed by the recent \
-conversation and the user's latest question.
+You are an expert legal and contractual assistant responding to user inquiries. Below are the relevant document excerpts, followed by the recent conversation history and the user's latest question.
 
-INSTRUCTIONS:
-- Answer ONLY based on the document excerpts below.
-- These excerpts ARE the document — do NOT say you don't know which document is being discussed.
-- If asked what the document is about, summarize the key topics from the excerpts.
-- Cite your sources using [Source N] tags.
-- Be concise and factual. Do not make up information.
-- Use the conversation history for context on follow-up questions.
+Guidelines:
+- **Cite Sources explicitly**: Incorporate citations inline exactly where the information is stated using the format [Source N] (e.g., "The termination period is 30 days [Source 2].").
+- **Clarity and Structure**: Use short, professional sentences. Break your response into readable paragraphs. If listing requirements, clauses, or multiple points, ALWAYS use bullet points. DO NOT output a single wall of text.
+- **Strict Grounding**: Base your answer ONLY on the excerpts provided. Use the conversation history solely to understand context (e.g., resolving pronouns like "it" or referencing earlier parts of the discussion). Do not hallucinate outside the given text.
+- **Completeness**: Provide a comprehensive yet concise answer covering all necessary details from the text.
+- **Follow-up Questions**: At the very end of your response, provide 3 suggested follow-up questions the user could ask to learn more about this topic, formatted as a bulleted list titled '💡 **Suggested Follow-up Questions:**'
 
 DOCUMENT EXCERPTS:
 {context}
@@ -98,8 +94,7 @@ def _use_local_llm() -> bool:
 def get_llm():
     """
     Lazy-load the LLM (singleton).
-    Prefers local GGUF (llama-cpp-python) if LOCAL_MODEL_PATH is set and exists;
-    otherwise uses OpenAI if OPENAI_API_KEY is set.
+    Order: local GGUF (if path set) → Groq (if GROQ_API_KEY set) → OpenAI (if OPENAI_API_KEY set).
     """
     global _llm_instance
     if _llm_instance is not None:
@@ -120,6 +115,17 @@ def get_llm():
         )
         return _llm_instance
 
+    if config.GROQ_API_KEY:
+        from langchain_groq import ChatGroq
+        _llm_instance = ChatGroq(
+            model=config.GROQ_MODEL,
+            api_key=config.GROQ_API_KEY,
+            temperature=config.LLM_TEMPERATURE,
+            max_tokens=config.LLM_MAX_TOKENS,
+        )
+        logger.info("Using Groq model: %s", config.GROQ_MODEL)
+        return _llm_instance
+
     if config.OPENAI_API_KEY:
         from langchain_openai import ChatOpenAI
         _llm_instance = ChatOpenAI(
@@ -132,9 +138,10 @@ def get_llm():
         return _llm_instance
 
     raise ValueError(
-        "No LLM configured. Either:\n"
-        "  1. Set LOCAL_MODEL_PATH in .env to a GGUF model file (e.g. ./models/your-model.gguf), or\n"
-        "  2. Set OPENAI_API_KEY in .env to use OpenAI (e.g. gpt-4o-mini)."
+        "No LLM configured. Set one of in .env:\n"
+        "  1. LOCAL_MODEL_PATH (GGUF file), or\n"
+        "  2. GROQ_API_KEY (e.g. llama-3.1-8b-instant), or\n"
+        "  3. OPENAI_API_KEY (e.g. gpt-4o-mini)."
     )
 
 
@@ -143,6 +150,10 @@ def get_llm():
 def build_rag_chain():
     """Build the LangChain RAG chain: prompt | LLM | output parser."""
     llm = get_llm()
+    # Optional: use a smaller max_tokens for Q&A to speed up replies (summarization keeps LLM_MAX_TOKENS)
+    qa_max = config.LLM_MAX_TOKENS_QA or config.LLM_MAX_TOKENS
+    if config.LLM_MAX_TOKENS_QA:
+        llm = llm.bind(max_tokens=config.LLM_MAX_TOKENS_QA)
     return _rag_prompt | llm | StrOutputParser()
 
 
@@ -167,15 +178,14 @@ def apply_output_guardrails(answer: str, context_docs: list[Document]) -> str:
     has_citations = bool(re.search(r"\[Source\s*\d+\]", answer))
     if not has_citations and context_docs:
         sources = ", ".join(
-            sorted({d.metadata.get("source", "unknown") for d in context_docs})
+            sorted({f"`{d.metadata.get('source', 'unknown')}`" for d in context_docs})
         )
-        answer += f"\n\n_Note: This answer is based on content from: {sources}_"
+        answer += f"\n\n> ℹ️ *Note: This answer is based on content from: {sources}*"
 
     answer += (
-        "\n\n---\n"
-        "_Disclaimer: This is an AI-generated summary and does not "
+        "\n\n> ⚠️ *Disclaimer: This is an AI-generated response and does not "
         "constitute legal advice. Always consult a qualified professional "
-        "for legal matters._"
+        "for legal matters.*"
     )
 
     return answer
@@ -314,7 +324,12 @@ def stream_answer_question(
         "Streamed answer with %d sources: '%.80s...'",
         len(sources), question,
     )
-    yield {"answer": final_answer, "sources": sources, "done": True}
+    yield {
+        "answer": final_answer, 
+        "sources": sources, 
+        "done": True, 
+        "context_text": [d.page_content for d in context_docs]
+    }
 
 
 # ── CLI helper ───────────────────────────────────────────────────

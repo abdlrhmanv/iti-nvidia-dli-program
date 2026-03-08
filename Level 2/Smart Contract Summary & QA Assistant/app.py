@@ -14,6 +14,7 @@ import gradio as gr
 import config
 from pipelines.ingestion import ingest_document
 from pipelines.llm_pipeline import stream_answer_question, get_llm
+from pipelines.summarization import summarize_document
 from pipelines.vectorstore import clear_vectorstore
 
 logging.basicConfig(
@@ -42,69 +43,96 @@ def build_ui():
             "Follow-up questions are supported — the assistant remembers the conversation."
         )
 
-        # ── Upload Row ──────────────────────────────────────────
-        with gr.Row():
-            with gr.Column(scale=3):
-                file_input = gr.File(
-                    label="Document (PDF or DOCX)",
-                    file_types=[".pdf", ".docx"],
-                    type="filepath",
+        with gr.Tabs():
+            # ── Tab 1: Upload & Summarize ───────────────────────────
+            with gr.TabItem("Upload Document"):
+                with gr.Row():
+                    with gr.Column(scale=3):
+                        file_input = gr.File(
+                            label="Document (PDF or DOCX)",
+                            file_types=[".pdf", ".docx"],
+                            type="filepath",
+                        )
+                    with gr.Column(scale=1, min_width=160):
+                        upload_btn = gr.Button("📤 Load document", variant="primary", size="lg")
+                        summarize_btn = gr.Button("📝 Summarize", variant="secondary", size="sm")
+
+                # Document status
+                doc_status = gr.Markdown(
+                    value="*No document loaded yet. Upload a PDF or DOCX to get started.*",
+                    elem_id="doc-status",
                 )
-            with gr.Column(scale=1, min_width=160):
-                upload_btn = gr.Button("📤 Load document", variant="primary", size="lg")
-                clear_btn = gr.Button("🗑️ Clear chat", variant="secondary", size="sm")
+                
+                # Sample documents for quick testing
+                gr.Examples(
+                    examples=[
+                        str(config.UPLOAD_DIR / "vertrag-ueber-freie-mitarbeiter-englisch-data-data.pdf"),
+                        str(config.UPLOAD_DIR / "recht-useful-information-on-business-secrets-english-data.pdf")
+                    ],
+                    inputs=file_input,
+                    label="Try these sample documents if you don't have one!"
+                )
+                
+                # Summary output area
+                summary_output = gr.Markdown(label="Document Summary")
 
-        # ── Document status ─────────────────────────────────────
-        doc_status = gr.Markdown(
-            value="*No document loaded yet. Upload a PDF or DOCX to get started.*",
-            elem_id="doc-status",
-        )
-
-        # ── Chat ────────────────────────────────────────────────
-        chatbot = gr.Chatbot(
-            label="Chat",
-            height=450,
-        )
-        with gr.Row():
-            msg_input = gr.Textbox(
-                placeholder="Ask a question about the document...",
-                label="Message",
-                lines=1,
-                show_label=False,
-                scale=5,
-            )
-            send_btn = gr.Button("Send", variant="primary", scale=1)
+            # ── Tab 2: Q&A Chat ─────────────────────────────────────
+            with gr.TabItem("Q & A Chat"):
+                chatbot = gr.Chatbot(
+                    label="Chat",
+                    height=650,
+                )
+                with gr.Row():
+                    msg_input = gr.Textbox(
+                        placeholder="Ask a question about the document...",
+                        label="Message",
+                        lines=1,
+                        show_label=False,
+                        scale=5,
+                    )
+                    send_btn = gr.Button("Send", variant="primary", scale=1)
+                
+                with gr.Row():
+                    clear_btn = gr.Button("🗑️ Clear chat", variant="secondary", size="sm")
 
         # ── Upload handler ──────────────────────────────────────
         def on_upload(file, history):
             path = _path_from_file(file)
             if path is None:
-                return history, gr.File(value=None), "*No document loaded.*"
+                return history, gr.File(value=None), "*No document loaded.*", ""
             ext = path.suffix.lower()
             if ext not in config.SUPPORTED_EXTENSIONS:
                 return (
                     history + [{"role": "assistant", "content": f"❌ Unsupported file type: **{ext}**. Please use PDF or DOCX."}],
                     gr.File(value=None),
                     "*No document loaded.*",
+                    "",
                 )
             try:
                 clear_vectorstore()
                 result = ingest_document(path)
                 status = (
                     f"📄 **{result['filename']}** — "
-                    f"{result['chunks']} chunks | "
+                    f"{result['parent_chunks']} parent chunks | "
+                    f"{result['child_chunks']} child chunks | "
                     f"{result['characters']:,} characters | "
                     f"chunk size: {result['chunk_size']}"
                 )
+                logger.info("Upload successful: %s", result)
+                
+                # Update the displayed stats using the new dictionary keys
                 msg = (
-                    f"✅ I've loaded **{result['filename']}** "
-                    f"({result['chunks']} chunks, {result['characters']:,} characters). "
-                    "Ask me anything about this document!"
+                    f"🎉 **Success!** I've fully processed `{result['filename']}`.\n\n"
+                    f"*Stats: {result['parent_chunks']} parent chunks | "
+                    f"{result['child_chunks']} child chunks | "
+                    f"{result['characters']:,} characters.*\n\n"
+                    "**You can now ask me anything about this document!**"
                 )
                 return (
                     history + [{"role": "assistant", "content": msg}],
                     gr.File(value=None),
                     status,
+                    "",
                 )
             except Exception as e:
                 logger.exception("Upload failed")
@@ -112,12 +140,13 @@ def build_ui():
                     history + [{"role": "assistant", "content": f"**Error:** {e}"}],
                     gr.File(value=None),
                     "*Upload failed.*",
+                    "",
                 )
 
         upload_btn.click(
             fn=on_upload,
             inputs=[file_input, chatbot],
-            outputs=[chatbot, file_input, doc_status],
+            outputs=[chatbot, file_input, doc_status, summary_output],
         )
 
         # ── Clear chat ──────────────────────────────────────────
@@ -125,6 +154,25 @@ def build_ui():
             return [], "*Document still loaded. Ask more questions or upload a new one.*"
 
         clear_btn.click(fn=on_clear, outputs=[chatbot, doc_status])
+
+        # ── Summarize handler ───────────────────────────────────
+        _SUMMARIZE_LOADING_STATUS = "🔄 **Summarizing document...** (this may take 2–5 minutes)"
+
+        def on_summarize(current_doc_status):
+            yield _SUMMARIZE_LOADING_STATUS, _SUMMARIZE_LOADING_STATUS
+
+            try:
+                summary = summarize_document()
+                yield f"**Document Summary:**\n\n{summary}", current_doc_status
+            except Exception as e:
+                logger.exception("Summarization failed")
+                yield f"**Error:** {e}", current_doc_status
+
+        summarize_btn.click(
+            fn=on_summarize,
+            inputs=[doc_status],
+            outputs=[summary_output, doc_status],
+        )
 
         # ── Chat handler (streaming with multi-turn) ────────────
         def respond(message: str, history: list):
@@ -146,10 +194,20 @@ def build_ui():
                 for chunk in stream_answer_question(msg, chat_history=history[:-2]):
                     answer = chunk["answer"]
                     if chunk["done"] and chunk["sources"]:
-                        answer += "\n\n_Sources:_ " + "; ".join(
-                            f"{s['source']} (chunk {s['chunk_index']})"
-                            for s in chunk["sources"]
+                        answer += "\n\n---\n**📚 References:**\n" + "\n".join(
+                            f"- **Source {i+1}**: `{s['source']}` *(Excerpt {s['chunk_index']})*"
+                            for i, s in enumerate(chunk["sources"])
                         )
+                        # Add an expandable toggle containing the full raw context pieces
+                        context_texts = chunk.get("context_text", [])
+                        if context_texts:
+                            accordion_html = "\n\n<details><summary>🔎 <b>View Retrieved Context</b></summary>\n\n"
+                            for i, ct in enumerate(context_texts):
+                                # Replace newlines with breaks or keep as code blocks
+                                accordion_html += f"**Source {i+1}**:\n```text\n{ct}\n```\n\n"
+                            accordion_html += "</details>"
+                            answer += accordion_html
+
                     history[-1] = {"role": "assistant", "content": answer}
                     yield history, ""
                 logger.info("Answer streamed successfully")

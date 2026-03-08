@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
+import uuid
 
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
@@ -59,34 +59,49 @@ def extract_text(file_path: str | Path) -> str:
 def chunk_text(
     text: str,
     source: str,
-    chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None,
-) -> list[Document]:
+) -> tuple[list[Document], list[Document]]:
     """
-    Split extracted text into LangChain Documents with metadata.
-    Chunk size and overlap are configurable via parameters or config.
+    Split extracted text into Parent Documents (large) and Child Documents (small).
+    Links them together via a shared 'doc_id' metadata field.
     """
-    chunk_size = chunk_size or config.CHUNK_SIZE
-    chunk_overlap = chunk_overlap or config.CHUNK_OVERLAP
-
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
+    parent_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config.PARENT_CHUNK_SIZE,
+        chunk_overlap=config.PARENT_CHUNK_OVERLAP,
+        length_function=len,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    
+    child_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config.CHILD_CHUNK_SIZE,
+        chunk_overlap=config.CHILD_CHUNK_OVERLAP,
         length_function=len,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
-    chunks = splitter.create_documents(
+    parent_docs = parent_splitter.create_documents(
         texts=[text],
         metadatas=[{"source": source}],
     )
 
-    for i, chunk in enumerate(chunks):
-        chunk.metadata["chunk_index"] = i
+    child_docs = []
+    
+    for i, p_doc in enumerate(parent_docs):
+        # Assign a unique ID to the parent
+        doc_id = str(uuid.uuid4())
+        p_doc.metadata["doc_id"] = doc_id
+        p_doc.metadata["chunk_index"] = i
+        
+        # Split the parent into smaller children
+        sub_docs = child_splitter.split_documents([p_doc])
+        for sub_doc in sub_docs:
+            # The child must carry the exact same 'doc_id' map back to the parent
+            sub_doc.metadata["doc_id"] = doc_id
+            child_docs.append(sub_doc)
 
-    logger.info("Split '%s' into %d chunks (size=%d, overlap=%d)",
-                source, len(chunks), chunk_size, chunk_overlap)
-    return chunks
+    logger.info("Split '%s' into %d parent chunks and %d child chunks",
+                source, len(parent_docs), len(child_docs))
+                
+    return parent_docs, child_docs
 
 
 # ── Top-Level Ingestion Entrypoint ───────────────────────────────
@@ -95,22 +110,23 @@ def save_uploaded_file(file_path: str | Path) -> Path:
     """Copy an uploaded file into the project uploads directory."""
     src = Path(file_path)
     dest = config.UPLOAD_DIR / src.name
-    shutil.copy2(src, dest)
-    logger.info("Saved uploaded file to %s", dest)
+    try:
+        shutil.copy2(src, dest)
+        logger.info("Saved uploaded file to %s", dest)
+    except shutil.SameFileError:
+        logger.info("File already exists at %s", dest)
     return dest
 
 
 def ingest_document(
     file_path: str | Path,
-    chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None,
 ) -> dict:
     """
-    Full ingestion pipeline:
+    Full ingestion pipeline (Parent-Child Strategy):
       1. Copy file to uploads/
       2. Extract text
-      3. Chunk the text
-      4. Embed & store in ChromaDB
+      3. Create Parent (large) and Child (small) chunks
+      4. Persist Parents in Docstore, embed Children in Chroma
 
     Returns a summary dict with ingestion statistics.
     """
@@ -128,21 +144,19 @@ def ingest_document(
     if not text.strip():
         raise ValueError(f"No extractable text found in {path.name}")
 
-    chunks = chunk_text(
+    parent_docs, child_docs = chunk_text(
         text,
         source=path.name,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
     )
 
-    add_documents_to_store(chunks)
+    add_documents_to_store(parent_docs, child_docs)
 
     return {
         "filename": path.name,
         "characters": len(text),
-        "chunks": len(chunks),
-        "chunk_size": chunk_size or config.CHUNK_SIZE,
-        "chunk_overlap": chunk_overlap or config.CHUNK_OVERLAP,
+        "parent_chunks": len(parent_docs),
+        "child_chunks": len(child_docs),
+        "chunk_size": config.PARENT_CHUNK_SIZE,
         "status": "success",
     }
 
@@ -155,12 +169,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
     if len(sys.argv) < 2:
-        print("Usage: python -m pipelines.ingestion <file_path> [chunk_size] [chunk_overlap]")
+        print("Usage: python -m pipelines.ingestion <file_path>")
         sys.exit(1)
-
     fpath = sys.argv[1]
-    cs = int(sys.argv[2]) if len(sys.argv) > 2 else None
-    co = int(sys.argv[3]) if len(sys.argv) > 3 else None
 
-    result = ingest_document(fpath, chunk_size=cs, chunk_overlap=co)
+    result = ingest_document(fpath)
     print(f"\nIngestion complete: {result}")

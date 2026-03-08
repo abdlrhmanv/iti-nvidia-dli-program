@@ -23,14 +23,20 @@ Coursework and project materials for the **NVIDIA Deep Learning Institute (DLI)*
 │       │   ├── AI Agent Project Initialization Prompt.md
 │       │   ├── Phase 1.md
 │       │   ├── Phase 2.md
+│       │   ├── Phase 3.md
+│       │   ├── Phase 4 - Additional Features.md
 │       │   └── Smart_Contract_Assistant_Spec.pdf
 │       ├── pipelines/                         # Core RAG pipeline modules
 │       │   ├── ingestion.py                   # Document ingestion pipeline
 │       │   ├── retrieval.py                   # Semantic search & retrieval
 │       │   ├── llm_pipeline.py                # LLM answer generation with guardrails
+│       │   ├── summarization.py               # Full-document summarization
 │       │   └── vectorstore.py                 # ChromaDB vector store helpers
 │       ├── scripts/                           # Utility scripts
-│       │   └── init_vectordb.py               # Vector DB initialization & reset
+│       │   ├── init_vectordb.py                # Vector DB initialization & reset
+│       │   └── evaluate.py                    # RAG evaluation (LLM-as-judge)
+│       ├── app.py                             # Gradio UI (standalone)
+│       ├── api.py                             # FastAPI + LangServe + Gradio at /ui
 │       ├── config.py                          # Centralized configuration
 │       ├── requirements.txt                   # Python dependencies
 │       └── .env.example                       # Environment variable template
@@ -56,40 +62,9 @@ Advanced course focused on **Retrieval-Augmented Generation (RAG)** pipelines, c
 
 ### Capstone Project — Smart Contract Summary & Q&A Assistant
 
-A local RAG application that lets users upload contracts (PDF/DOCX) and ask questions about them via a conversational interface. The system extracts text, chunks it, generates embeddings, stores them in ChromaDB, and uses a local LLM to produce grounded answers with source citations.
+A local RAG application that lets users upload contracts (PDF/DOCX) and ask questions about them via a conversational interface. 
 
-**Tech Stack:**
-
-| Component | Technology |
-|-----------|------------|
-| Framework | LangChain, FastAPI, LangServe |
-| Embeddings | `all-MiniLM-L6-v2` (SentenceTransformers) |
-| Vector Store | ChromaDB (persistent, local) |
-| LLM | Local quantized model via `llama-cpp-python` |
-| File Parsing | PyMuPDF, python-docx |
-| UI | Gradio |
-
-**Target Environment:** Linux, 16 GB RAM, NVIDIA RTX 3060 (6 GB VRAM).
-
-#### Getting Started
-
-```bash
-cd "Level 2/Smart Contract Summary & QA Assistant"
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # edit with your settings
-```
-
-#### Usage
-
-```bash
-# Initialize the vector store
-python -m scripts.init_vectordb
-
-# Ingest a document
-python -m pipelines.ingestion <path-to-pdf-or-docx>
-```
+For full details, setup instructions, and architecture overview, please see the **[Project Documentation](./Level%202/Smart%20Contract%20Summary%20&%20QA%20Assistant/README.md)**.
 
 ## License
 

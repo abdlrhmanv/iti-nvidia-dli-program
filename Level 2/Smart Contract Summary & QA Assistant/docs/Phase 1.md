@@ -47,7 +47,7 @@ All third-party packages were declared in `requirements.txt`, grouped by purpose
 | **UI** | `gradio` | Web-based upload and chat interface (used in Phase 3) |
 | **Vector Store** | `chromadb` | Local persistent vector database |
 | **Embeddings** | `sentence-transformers` | Lightweight embedding models (GPU-accelerated) |
-| **File Parsing** | `PyMuPDF`, `pdfplumber`, `python-docx` | Text extraction from PDF and DOCX |
+| **File Parsing** | `PyMuPDF`, `python-docx` | Text extraction from PDF and DOCX |
 | **LLM** | `llama-cpp-python` | Local quantized LLM inference via GGUF models (used in Phase 2) |
 | **Utilities** | `python-dotenv`, `pydantic`, `pydantic-settings` | Environment variable loading, data validation |
 

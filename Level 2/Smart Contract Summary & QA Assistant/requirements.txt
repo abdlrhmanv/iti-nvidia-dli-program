@@ -2,9 +2,6 @@
 langchain>=0.3.0
 langchain-community>=0.3.0
 langchain-huggingface>=0.1.0
-langserve>=0.3.0
-fastapi>=0.115.0
-uvicorn>=0.32.0
 
 # UI
 gradio>=5.0.0
@@ -18,13 +15,20 @@ sentence-transformers>=3.0.0
 
 # File Parsing
 PyMuPDF>=1.24.0
-pdfplumber>=0.11.0
 python-docx>=1.1.0
 
 # LLM (local inference - quantized for 6GB VRAM)
 llama-cpp-python>=0.3.0
 
+# LLM (Groq = fast cloud; OpenAI = fallback when no local model)
+langchain-groq>=0.2.0
+langchain-openai>=0.2.0
+
 # Utilities
 python-dotenv>=1.0.0
 pydantic>=2.0.0
-pydantic-settings>=2.0.0
+# API Backend
+fastapi
+uvicorn
+langserve
+sse_starlette
