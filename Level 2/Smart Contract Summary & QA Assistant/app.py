@@ -63,16 +63,6 @@ def build_ui():
                     elem_id="doc-status",
                 )
                 
-                # Sample documents for quick testing
-                gr.Examples(
-                    examples=[
-                        str(config.UPLOAD_DIR / "vertrag-ueber-freie-mitarbeiter-englisch-data-data.pdf"),
-                        str(config.UPLOAD_DIR / "recht-useful-information-on-business-secrets-english-data.pdf")
-                    ],
-                    inputs=file_input,
-                    label="Try these sample documents if you don't have one!"
-                )
-                
                 # Summary output area
                 summary_output = gr.Markdown(label="Document Summary")
 

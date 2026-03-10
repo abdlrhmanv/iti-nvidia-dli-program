@@ -33,6 +33,7 @@ Guidelines:
 - **Clarity and Structure**: Use short, professional sentences. Break your response into readable paragraphs. If listing requirements, clauses, or multiple points, ALWAYS use bullet points for readability. DO NOT output a single wall of text.
 - **Strict Grounding**: Base your answer ONLY on the excerpts below. If the answer cannot be found in the provided text, state clearly: "I cannot find the answer to this question in the provided document." Do not hallucinate or guess.
 - **Completeness**: Provide a comprehensive yet concise answer covering all necessary details from the text.
+- **Proportional Depth**: Your answer should be proportional to the amount of relevant information in the context. If the context contains multiple relevant clauses, sections, or provisions, address each one thoroughly rather than giving a brief overview. A question with rich context deserves a detailed, multi-paragraph answer.
 - **Follow-up Questions**: At the very end of your response, provide 3 suggested follow-up questions the user could ask to learn more about this topic, formatted as a bulleted list titled '💡 **Suggested Follow-up Questions:**'
 
 DOCUMENT EXCERPTS:
@@ -50,6 +51,7 @@ Guidelines:
 - **Clarity and Structure**: Use short, professional sentences. Break your response into readable paragraphs. If listing requirements, clauses, or multiple points, ALWAYS use bullet points. DO NOT output a single wall of text.
 - **Strict Grounding**: Base your answer ONLY on the excerpts provided. Use the conversation history solely to understand context (e.g., resolving pronouns like "it" or referencing earlier parts of the discussion). Do not hallucinate outside the given text.
 - **Completeness**: Provide a comprehensive yet concise answer covering all necessary details from the text.
+- **Proportional Depth**: Your answer should be proportional to the amount of relevant information in the context. If the context contains multiple relevant clauses, sections, or provisions, address each one thoroughly rather than giving a brief overview. A question with rich context deserves a detailed, multi-paragraph answer.
 - **Follow-up Questions**: At the very end of your response, provide 3 suggested follow-up questions the user could ask to learn more about this topic, formatted as a bulleted list titled '💡 **Suggested Follow-up Questions:**'
 
 DOCUMENT EXCERPTS:
@@ -61,6 +63,10 @@ CONVERSATION HISTORY:
 USER QUESTION: {question}
 
 ANSWER:"""
+
+_rag_prompt = ChatPromptTemplate.from_messages([
+    ("human", RAG_PROMPT_TEMPLATE),
+])
 
 
 def _build_prompt(context: str, question: str, history: str = ""):
@@ -214,8 +220,15 @@ def answer_question(
     if not context_docs:
         return {
             "answer": (
-                "No relevant documents were found for your question. "
-                "Please upload a document first using the ingestion pipeline."
+                "👋 **Welcome! I'm the Smart Contract Summary & QA Assistant.**\n\n"
+                "I specialize in analyzing and answering questions about legal and contractual documents. "
+                "Here's what I can do for you:\n\n"
+                "- 📄 **Summarize** uploaded documents\n"
+                "- ❓ **Answer questions** grounded in the document's content\n"
+                "- 🔍 **Cite sources** so you can verify every claim\n\n"
+                "---\n\n"
+                "⚠️ **No document is currently loaded.** "
+                "Please navigate to the **Upload Document** tab and upload a **PDF** or **DOCX** file to get started."
             ),
             "sources": [],
             "raw_answer": "",
@@ -280,8 +293,15 @@ def stream_answer_question(
     if not context_docs:
         yield {
             "answer": (
-                "No relevant documents were found for your question. "
-                "Please upload a document first."
+                "👋 **Welcome! I'm the Smart Contract Summary & QA Assistant.**\n\n"
+                "I specialize in analyzing and answering questions about legal and contractual documents. "
+                "Here's what I can do for you:\n\n"
+                "- 📄 **Summarize** uploaded documents\n"
+                "- ❓ **Answer questions** grounded in the document's content\n"
+                "- 🔍 **Cite sources** so you can verify every claim\n\n"
+                "---\n\n"
+                "⚠️ **No document is currently loaded.** "
+                "Please navigate to the **Upload Document** tab and upload a **PDF** or **DOCX** file to get started."
             ),
             "sources": [],
             "done": True,
